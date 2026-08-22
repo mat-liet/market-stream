@@ -52,6 +52,13 @@
       <groupId>io.quarkus</groupId>
       <artifactId>quarkus-messaging-kafka</artifactId>
     </dependency>
+    <!-- Required whenever Confluent Avro classes are on the classpath (they arrive
+         transitively via market-schemas): the Kafka extension fails the build
+         without it, since it needs to register the Confluent SerDes for reflection. -->
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-confluent-registry-avro</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.clickhouse</groupId>
       <artifactId>clickhouse-jdbc</artifactId>
