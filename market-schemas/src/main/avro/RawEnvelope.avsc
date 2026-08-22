@@ -1,0 +1,61 @@
+{
+  "type": "record",
+  "name": "RawEnvelope",
+  "namespace": "com.marketstream.avro",
+  "doc": "Wraps an exchange frame verbatim for raw.kraken.* (section 12.3). Deliberately opaque about payload semantics so replay is byte-faithful. Carries no EventHeader: the exchange event time lives inside the payload and is not extracted until normalisation.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": {"type": "string", "logicalType": "uuid"}
+    },
+    {
+      "name": "exchange",
+      "type": "com.marketstream.avro.Exchange"
+    },
+    {
+      "name": "channel",
+      "type": "string",
+      "doc": "trade | book"
+    },
+    {
+      "name": "instrument",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Parsed from the frame for keying only, best-effort. Null for frames with no resolvable instrument."
+    },
+    {
+      "name": "receivedAt",
+      "type": {"type": "long", "logicalType": "timestamp-millis"},
+      "doc": "Ingestion time. The envelope has no exchange event time yet."
+    },
+    {
+      "name": "sourceConnectionId",
+      "type": "string",
+      "doc": "Which WebSocket connection delivered this."
+    },
+    {
+      "name": "ingestSequence",
+      "type": "long",
+      "doc": "Monotonic per connection. A gap means the ingestor restarted, detectable independently of any exchange sequence."
+    },
+    {
+      "name": "payload",
+      "type": "bytes",
+      "doc": "The original frame, verbatim. Never re-encoded."
+    },
+    {
+      "name": "payloadEncoding",
+      "type": "string",
+      "default": "json"
+    },
+    {
+      "name": "traceId",
+      "type": "string"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "type": "record",
+  "name": "TradeEvent",
+  "namespace": "com.marketstream.avro",
+  "doc": "Canonical trade on normalized.trades (section 12.4). eventTime is the Kraken trade timestamp.",
+  "fields": [
+    {
+      "name": "header",
+      "type": "com.marketstream.avro.EventHeader"
+    },
+    {
+      "name": "tradeId",
+      "type": "string",
+      "doc": "Kraken's trade_id where present, else a deterministic composite key."
+    },
+    {
+      "name": "price",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18},
+      "doc": "Never float: rounding drift compounds through VWAP and checksums."
+    },
+    {
+      "name": "quantity",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18}
+    },
+    {
+      "name": "side",
+      "type": {
+        "type": "enum",
+        "name": "Side",
+        "symbols": ["BUY", "SELL"]
+      },
+      "doc": "Aggressor side."
+    },
+    {
+      "name": "dedupeKey",
+      "type": "string",
+      "doc": "instrument|tradeId, or the composite fallback. Explicit so the dedupe store and any idempotent sink share one definition."
+    }
+  ]
+}

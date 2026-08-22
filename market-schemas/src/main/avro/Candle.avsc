@@ -1,0 +1,86 @@
+{
+  "type": "record",
+  "name": "Candle",
+  "namespace": "com.marketstream.avro",
+  "doc": "Event-time OHLCV candle on derived.candles (section 12.7). header.eventTime equals windowStart.",
+  "fields": [
+    {
+      "name": "header",
+      "type": "com.marketstream.avro.EventHeader"
+    },
+    {
+      "name": "window",
+      "type": {
+        "type": "enum",
+        "name": "CandleWindow",
+        "symbols": ["S1", "S10", "M1"]
+      },
+      "doc": "Window size is a field, not a topic: all windows share derived.candles."
+    },
+    {
+      "name": "windowStart",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    },
+    {
+      "name": "windowEnd",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    },
+    {
+      "name": "open",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18}
+    },
+    {
+      "name": "high",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18}
+    },
+    {
+      "name": "low",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18}
+    },
+    {
+      "name": "close",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18}
+    },
+    {
+      "name": "volume",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18},
+      "doc": "Base-asset volume."
+    },
+    {
+      "name": "quoteVolume",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18},
+      "doc": "VWAP numerator, carried so VWAP stays exactly recomputable."
+    },
+    {
+      "name": "vwap",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18}
+    },
+    {
+      "name": "buyVolume",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18}
+    },
+    {
+      "name": "sellVolume",
+      "type": {"type": "bytes", "logicalType": "decimal", "precision": 38, "scale": 18}
+    },
+    {
+      "name": "tradeCount",
+      "type": "int"
+    },
+    {
+      "name": "isFinal",
+      "type": "boolean",
+      "doc": "false = provisional (window still open); true = emitted once after grace and immutable thereafter (invariant 1)."
+    },
+    {
+      "name": "inputTradeCount",
+      "type": "int",
+      "doc": "Trades actually folded in, for late-arrival auditing."
+    },
+    {
+      "name": "processorVersion",
+      "type": "string",
+      "doc": "Which build produced this, so a wrong number is traceable to its code."
+    }
+  ]
+}

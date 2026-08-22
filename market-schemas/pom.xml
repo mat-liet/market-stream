@@ -27,6 +27,17 @@
       <groupId>io.confluent</groupId>
       <artifactId>kafka-streams-avro-serde</artifactId>
     </dependency>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>market-common</artifactId>
+    </dependency>
+
+    <!-- MockSchemaRegistryClient, behind the mock:// pseudo-URL used in tests -->
+    <dependency>
+      <groupId>io.confluent</groupId>
+      <artifactId>kafka-schema-registry-client</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -43,6 +54,12 @@
             </goals>
             <configuration>
               <sourceDirectory>${project.basedir}/src/main/avro</sourceDirectory>
+              <!-- Shared types live outside sourceDirectory on purpose. Listing a file
+                   that is also in sourceDirectory makes the plugin compile it twice and
+                   fail with a redefinition error. -->
+              <imports>
+                <import>${project.basedir}/src/main/avro-shared/EventHeader.avsc</import>
+              </imports>
               <outputDirectory>${project.build.directory}/generated-sources/avro</outputDirectory>
               <stringType>String</stringType>
               <!-- Required so decimal logical types generate as BigDecimal, not ByteBuffer.

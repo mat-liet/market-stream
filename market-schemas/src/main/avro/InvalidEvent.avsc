@@ -1,0 +1,79 @@
+{
+  "type": "record",
+  "name": "InvalidEvent",
+  "namespace": "com.marketstream.avro",
+  "doc": "Structured data-quality failure on invalid.events (section 12.10). This is the analytical DLQ: failures the system understood well enough to categorise. Frames too malformed to categorise go to dead-letter as raw bytes instead. Carries no EventHeader because the failing input may have had no parseable identity.",
+  "fields": [
+    {
+      "name": "eventId",
+      "type": {"type": "string", "logicalType": "uuid"}
+    },
+    {
+      "name": "occurredAt",
+      "type": {"type": "long", "logicalType": "timestamp-millis"}
+    },
+    {
+      "name": "stage",
+      "type": {
+        "type": "enum",
+        "name": "ProcessingStage",
+        "symbols": ["INGEST", "NORMALIZE", "BOOK_APPLY", "WINDOW", "ALERT", "SINK"]
+      }
+    },
+    {
+      "name": "reason",
+      "type": {
+        "type": "enum",
+        "name": "InvalidReason",
+        "symbols": [
+          "SCHEMA_INVALID",
+          "PARSE_ERROR",
+          "CHECKSUM_MISMATCH",
+          "SEQUENCE_GAP",
+          "IMPOSSIBLE_STATE",
+          "LATE_BEYOND_GRACE",
+          "UNKNOWN_TYPE"
+        ]
+      }
+    },
+    {
+      "name": "errorClass",
+      "type": ["null", "string"],
+      "default": null
+    },
+    {
+      "name": "originalTopic",
+      "type": "string"
+    },
+    {
+      "name": "originalKey",
+      "type": ["null", "string"],
+      "default": null
+    },
+    {
+      "name": "originalPayload",
+      "type": ["null", "bytes"],
+      "default": null,
+      "doc": "Enough to forensically replay or diagnose."
+    },
+    {
+      "name": "instrument",
+      "type": ["null", "string"],
+      "default": null
+    },
+    {
+      "name": "traceId",
+      "type": ["null", "string"],
+      "default": null
+    },
+    {
+      "name": "processorVersion",
+      "type": "string"
+    },
+    {
+      "name": "schemaVersion",
+      "type": "int",
+      "default": 1
+    }
+  ]
+}
