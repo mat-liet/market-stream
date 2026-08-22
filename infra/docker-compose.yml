@@ -13,7 +13,7 @@ services:
     container_name: ms-kafka
     profiles: [core]
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     environment:
       # --- KRaft: no ZooKeeper, single node acting as both broker and controller
       KAFKA_NODE_ID: 1
@@ -55,7 +55,7 @@ services:
       kafka:
         condition: service_healthy
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
@@ -92,8 +92,8 @@ services:
     container_name: ms-clickhouse
     profiles: [core]
     ports:
-      - "8123:8123"   # HTTP
-      - "9000:9000"   # native
+      - "127.0.0.1:8123:8123"   # HTTP
+      - "127.0.0.1:9000:9000"   # native
     environment:
       CLICKHOUSE_DB: market
       CLICKHOUSE_USER: market
@@ -101,7 +101,6 @@ services:
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - clickhouse-data:/var/lib/clickhouse
-      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ulimits:
       nofile:
         soft: 262144
@@ -119,20 +118,60 @@ services:
     container_name: ms-postgres
     profiles: [core]
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: market
       POSTGRES_USER: market
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-market}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U market -d market"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 10s
+    logging: *default-logging
+
+  # Migrations run on every `make up`, not just first boot: docker-entrypoint-initdb.d
+  # only fires against an empty volume, which would silently skip every schema change
+  # made after the first startup.
+
+  flyway:
+    image: flyway/flyway:11
+    container_name: ms-flyway
+    profiles: [core]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./postgres/migrations:/flyway/sql:ro
+    command:
+      - -url=jdbc:postgresql://postgres:5432/market
+      - -user=market
+      - -password=${POSTGRES_PASSWORD:-market}
+      - -connectRetries=10
+      - -baselineOnMigrate=true
+      - migrate
+    restart: "no"
+    logging: *default-logging
+
+  clickhouse-init:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: ms-clickhouse-init
+    profiles: [core]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./clickhouse/migrate.sh:/migrate.sh:ro
+      - ./clickhouse/migrations:/migrations:ro
+    entrypoint: ["/bin/bash", "/migrate.sh"]
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_USER: market
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-market}
+    restart: "no"
     logging: *default-logging
 
   redpanda-console:
@@ -145,7 +184,7 @@ services:
       schema-registry:
         condition: service_healthy
     ports:
-      - "8085:8080"
+      - "127.0.0.1:8085:8080"
     environment:
       KAFKA_BROKERS: kafka:29092
       KAFKA_SCHEMAREGISTRY_ENABLED: "true"
@@ -159,7 +198,7 @@ services:
     container_name: ms-prometheus
     profiles: [observability]
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -175,7 +214,7 @@ services:
     depends_on:
       - prometheus
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
