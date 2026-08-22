@@ -27,6 +27,13 @@
       <groupId>io.confluent</groupId>
       <artifactId>kafka-streams-avro-serde</artifactId>
     </dependency>
+    <!-- Serde/Serializer interfaces. Declared explicitly rather than relied on
+         transitively, since the Confluent SerDe artifacts do not export it at compile
+         scope. -->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+    </dependency>
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>market-common</artifactId>

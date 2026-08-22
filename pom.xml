@@ -48,6 +48,7 @@
     <testcontainers.version>1.20.6</testcontainers.version>
 
     <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+    <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
     <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     <maven-failsafe-plugin.version>3.5.2</maven-failsafe-plugin.version>
     <avro-maven-plugin.version>${avro.version}</avro-maven-plugin.version>
@@ -245,10 +246,39 @@
           <artifactId>avro-maven-plugin</artifactId>
           <version>${avro-maven-plugin.version}</version>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven-enforcer-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
 
     <plugins>
+      <!-- Fail loudly on the wrong JDK. Maven often resolves a newer JDK than the one
+           this project targets, and building on it succeeds quietly while producing
+           bytecode and behaviour we never tested. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-java-21</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[21,22)</version>
+                  <message>This build requires Java 21. Set JAVA_HOME to a JDK 21 installation.</message>
+                </requireJavaVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
