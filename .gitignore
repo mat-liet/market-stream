@@ -1,0 +1,39 @@
+# Maven
+target/
+pom.xml.versionsBackup
+.mvn/wrapper/maven-wrapper.jar
+
+# Quarkus
+.quarkus/
+*-runner
+*-runner.jar
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+nb-configuration.xml
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Docker volumes / local state
+infra/volumes/
+data/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
