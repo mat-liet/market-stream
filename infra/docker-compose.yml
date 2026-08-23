@@ -191,6 +191,47 @@ services:
       KAFKA_SCHEMAREGISTRY_URLS: http://schema-registry:8081
     logging: *default-logging
 
+  # ------------------------------------------------------------ services ----
+  #
+  # Kept in their own profile so `make up` stays a fast infrastructure-only loop: while
+  # working on a service you run it from the IDE against this stack, and only bring the
+  # containerised copy up when testing the deployed shape.
+
+  kraken-ingestor:
+    build:
+      context: ..
+      dockerfile: kraken-ingestor/Dockerfile
+    image: market-stream/kraken-ingestor:0.1.0-SNAPSHOT
+    container_name: ms-kraken-ingestor
+    profiles: [services]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/market
+      POSTGRES_USER: market
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-market}
+      KRAKEN_WS_URL: wss://ws.kraken.com/v2
+      METRICS_PORT: 9101
+    ports:
+      # Bound to loopback like every other published port: this is a local stack with no
+      # authentication in front of it.
+      - "127.0.0.1:9101:9101"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9101/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+
   # ------------------------------------------------------- observability ----
 
   prometheus:

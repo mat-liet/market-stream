@@ -1,5 +1,9 @@
 COMPOSE := docker compose -f infra/docker-compose.yml --project-name market-stream
-PROFILES := --profile core --profile observability
+# `up` deliberately excludes `services`: the fast inner loop is infra-only, with the
+# service run from the IDE against it. Teardown and inspection must see every profile,
+# or a `make down` would leave service containers running.
+PROFILES     := --profile core --profile observability
+ALL_PROFILES := $(PROFILES) --profile services
 
 .DEFAULT_GOAL := help
 
@@ -24,21 +28,27 @@ up: ## Start the full stack (core + observability)
 core: ## Start only the data path (no Prometheus/Grafana)
 	$(COMPOSE) --profile core up -d
 
+.PHONY: up-services
+up-services: ## Build and start the containerised services (kraken-ingestor)
+	$(COMPOSE) --profile core --profile services up -d --build
+	@echo
+	@echo "  Ingestor metrics  http://localhost:9101/metrics"
+
 .PHONY: down
 down: ## Stop the stack, keeping volumes
-	$(COMPOSE) $(PROFILES) down
+	$(COMPOSE) $(ALL_PROFILES) down
 
 .PHONY: reset
 reset: ## Stop the stack and wipe all volumes (Kafka, ClickHouse, Postgres)
-	$(COMPOSE) $(PROFILES) down -v
+	$(COMPOSE) $(ALL_PROFILES) down -v
 
 .PHONY: ps
 ps: ## Show container status
-	$(COMPOSE) $(PROFILES) ps
+	$(COMPOSE) $(ALL_PROFILES) ps
 
 .PHONY: logs
 logs: ## Tail logs for all services (make logs SERVICE=kafka for one)
-	$(COMPOSE) $(PROFILES) logs -f $(SERVICE)
+	$(COMPOSE) $(ALL_PROFILES) logs -f $(SERVICE)
 
 # ------------------------------------------------------------- inspection ----
 

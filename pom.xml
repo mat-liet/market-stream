@@ -45,12 +45,13 @@
     <junit.version>5.11.4</junit.version>
     <assertj.version>3.27.3</assertj.version>
     <mockito.version>5.15.2</mockito.version>
-    <testcontainers.version>1.20.6</testcontainers.version>
+    <testcontainers.version>1.21.3</testcontainers.version>
 
     <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
     <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
     <maven-failsafe-plugin.version>3.5.2</maven-failsafe-plugin.version>
+    <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
     <avro-maven-plugin.version>${avro.version}</avro-maven-plugin.version>
   </properties>
 
@@ -83,7 +84,49 @@
         <version>${project.version}</version>
       </dependency>
 
-      <!-- Quarkus platform (market-api) -->
+      <!-- IMPORTED BOMs: ORDER IS SIGNIFICANT.
+           When two imported BOMs manage the same artifact, the one declared first wins
+           silently — no warning, no error. The Quarkus platform BOM manages a very wide
+           surface (JUnit, Jackson, Micrometer, Testcontainers, Kafka, Avro...), so if it
+           came first it would quietly override the versions this file's properties claim
+           to set. It is therefore imported LAST: our explicit choices win, and Quarkus
+           fills in everything we have no opinion about.
+
+           This is not hypothetical. With the Quarkus BOM first, Testcontainers resolved to
+           1.20.6 rather than the declared version, whose Docker API level is rejected
+           outright by Docker Engine 29 — the build failed with "could not find a valid
+           Docker environment" while the property said otherwise. -->
+
+      <dependency>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers-bom</artifactId>
+        <version>${testcontainers.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.micrometer</groupId>
+        <artifactId>micrometer-bom</artifactId>
+        <version>${micrometer.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Quarkus platform (market-api). Last, deliberately — see above. -->
       <dependency>
         <groupId>${quarkus.platform.group-id}</groupId>
         <artifactId>${quarkus.platform.artifact-id}</artifactId>
@@ -132,24 +175,6 @@
         <version>${confluent.version}</version>
       </dependency>
 
-      <!-- JSON (raw Kraken frame parsing) -->
-      <dependency>
-        <groupId>com.fasterxml.jackson</groupId>
-        <artifactId>jackson-bom</artifactId>
-        <version>${jackson.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-
-      <!-- Observability -->
-      <dependency>
-        <groupId>io.micrometer</groupId>
-        <artifactId>micrometer-bom</artifactId>
-        <version>${micrometer.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-
       <!-- Logging -->
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -177,13 +202,6 @@
 
       <!-- Test -->
       <dependency>
-        <groupId>org.junit</groupId>
-        <artifactId>junit-bom</artifactId>
-        <version>${junit.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${assertj.version}</version>
@@ -194,13 +212,6 @@
         <artifactId>mockito-core</artifactId>
         <version>${mockito.version}</version>
         <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>testcontainers-bom</artifactId>
-        <version>${testcontainers.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -250,6 +261,34 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
           <version>${maven-enforcer-plugin.version}</version>
+        </plugin>
+        <!-- Runnable fat jars for the plain-Java services. Quarkus (market-api) builds
+             its own runner and must not use this. -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>${maven-shade-plugin.version}</version>
+          <configuration>
+            <createDependencyReducedPom>false</createDependencyReducedPom>
+            <filters>
+              <filter>
+                <artifact>*:*</artifact>
+                <excludes>
+                  <!-- Signatures cover the original jars, not the shaded one, and a
+                       stale signature fails verification at class-load time. -->
+                  <exclude>META-INF/*.SF</exclude>
+                  <exclude>META-INF/*.DSA</exclude>
+                  <exclude>META-INF/*.RSA</exclude>
+                  <exclude>module-info.class</exclude>
+                </excludes>
+              </filter>
+            </filters>
+            <transformers>
+              <!-- Confluent and Kafka both ship META-INF/services entries that would
+                   otherwise overwrite each other. -->
+              <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+            </transformers>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>

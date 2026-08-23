@@ -1,0 +1,19 @@
+# Build output: the image builds from source, and copying a host target/ in would both
+# bloat the context and risk shipping classes compiled by a different JDK.
+**/target/
+**/*.jar
+
+.git/
+.github/
+.idea/
+*.iml
+.vscode/
+
+.env
+.env.*
+!.env.example
+
+infra/
+docs/
+*.md
+!README.md

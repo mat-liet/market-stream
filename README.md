@@ -56,10 +56,20 @@ See [§26 of the design](market-data-platform-design.md#26-phased-implementation
 
 ## Getting started
 
-Nothing to run yet — implementation begins with the Phase 1 walking skeleton. Once M0 lands:
+Requires Docker and a **JDK 21** (the build enforces the version rather than silently
+producing bytecode from whichever JDK Maven happened to resolve).
 
 ```bash
-make up      # bring up Kafka, Schema Registry, ClickHouse, Postgres, and the services
-make lag     # per-consumer-group lag
-make reset   # wipe all volumes for a clean slate
+make up            # Kafka, Schema Registry, ClickHouse, Postgres, Prometheus, Grafana
+make build         # compile and test every module
+make up-services   # additionally build and run the containerised services
+make lag           # per-consumer-group lag
+make reset         # wipe all volumes for a clean slate
 ```
+
+`make up` is deliberately infrastructure-only, so the inner loop is to run a service from
+the IDE against the stack. `make up-services` brings up the containerised copy for testing
+the deployed shape.
+
+Integration tests (`*IT`) run against the `make up` stack and **skip** when it is not
+running, so `mvn verify` passes either way.
