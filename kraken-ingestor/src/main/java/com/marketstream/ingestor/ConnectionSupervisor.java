@@ -143,13 +143,38 @@ public final class ConnectionSupervisor implements Runnable, AutoCloseable {
             if (current != null) {
                 current.abort();
             }
-            handoff.shutdownNow();
+            drainHandoff(handoff);
             // Only forgive the backoff for a connection that actually stayed up. Resetting
             // on every successful handshake turns a connection that dies immediately after
             // connecting into a reconnect storm.
             if (Duration.between(connectedAt, Instant.now()).compareTo(config.silenceTimeout()) > 0) {
                 backoff.reset();
             }
+        }
+    }
+
+    /**
+     * Lets frames already taken off the socket finish reaching the queue.
+     *
+     * <p>{@code shutdownNow} would be wrong here: it cancels queued handoff tasks, and each
+     * one holds a frame Kraken has already delivered. Dropping those on a reconnect is
+     * exactly the silent loss this service exists to avoid — and it would happen precisely
+     * during the incidents where the data matters most. The wait is bounded so a handoff
+     * blocked on an unreachable Kafka cannot stop the reconnect indefinitely; if it expires
+     * the loss becomes visible instead of silent.
+     */
+    private void drainHandoff(ExecutorService handoff) {
+        handoff.shutdown();
+        try {
+            if (!handoff.awaitTermination(10, TimeUnit.SECONDS)) {
+                List<Runnable> abandoned = handoff.shutdownNow();
+                if (!abandoned.isEmpty()) {
+                    log.error("dropped {} received frames: handoff did not drain in 10s", abandoned.size());
+                }
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            handoff.shutdownNow();
         }
     }
 
@@ -163,6 +188,18 @@ public final class ConnectionSupervisor implements Runnable, AutoCloseable {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
+            }
+            // Silence we caused ourselves is not evidence of a dead connection. When the
+            // queue is full the handoff thread is blocked, the socket is deliberately not
+            // being read, and no frame can arrive by construction — so the watchdog would
+            // otherwise diagnose the backpressure it asked for as a failure and reconnect
+            // into it, repeatedly, for as long as the outage lasts. Each of those reconnects
+            // restarts ingestSequence, re-requests book snapshots, and hammers the exchange
+            // at its least convenient moment. Hold the clock instead, and let the watchdog
+            // resume judging the connection once we are reading again.
+            if (queue.remainingCapacity() == 0) {
+                lastFrameAt.set(Instant.now());
+                continue;
             }
             Duration silence = Duration.between(lastFrameAt.get(), Instant.now());
             if (silence.compareTo(config.silenceTimeout()) > 0) {

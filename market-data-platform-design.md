@@ -818,6 +818,25 @@ stateDiagram-v2
 
 ### 14.2 Transition conditions
 
+> **Finding from M2 (2026-08-23) — Kraken v2 book updates carry no sequence number.**
+>
+> The transitions below, and §14.3, assume a `sequence` field whose gaps signal divergence.
+> Capturing live `book` frames to `raw.kraken.book` and inspecting them shows `data[0]` has
+> exactly these fields: `asks`, `bids`, `checksum`, `symbol`, `timestamp`. There is no
+> sequence, counter, or revision anywhere in the frame.
+>
+> Consequences for Phase 3:
+> - **CRC32 becomes the sole divergence detector.** Every "or `sequence` gap" clause below
+>   and in §14.3 must be struck; there is nothing else to detect a dropped update with.
+> - Ordering is still guaranteed *within* a connection, because the partition key
+>   (`exchange|instrument`) puts one book on one partition and Kafka orders within it. What
+>   is lost is the ability to notice an update that Kraken never sent us at all.
+> - `ingestSequence` + `sourceConnectionId` on the envelope detect ingestor-side gaps and
+>   connection changes, but say nothing about exchange-side loss.
+> - This raises the cost of a missed checksum: with no independent gap signal, a corrupt
+>   book is only caught at the next checksum, so the checksum must be verified on **every**
+>   update rather than sampled.
+
 | From | To | Condition |
 |---|---|---|
 | UNINITIALISED | LOADING_SNAPSHOT | Subscription confirmed / first snapshot arrives |

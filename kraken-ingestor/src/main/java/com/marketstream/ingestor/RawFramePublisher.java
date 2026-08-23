@@ -63,8 +63,24 @@ public final class RawFramePublisher implements AutoCloseable {
         properties.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
         // A little batching costs a few milliseconds and roughly halves the request rate
         // during busy markets, which is when the ingestor is under most pressure.
-        properties.put(ProducerConfig.LINGER_MS_CONFIG, 5);
+        int lingerMs = 5;
+        int requestTimeoutMs = 30_000;
+        properties.put(ProducerConfig.LINGER_MS_CONFIG, lingerMs);
+        properties.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
         properties.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, config.producerMaxBlock().toMillis());
+        // Set explicitly because the default — 2 minutes — is a silent data-loss window. A
+        // record already accepted into the producer buffer is expired once this elapses, and
+        // during a four-minute broker outage that discarded 558 already-received frames,
+        // which showed up as exactly 558 gaps in that connection's ingestSequence.
+        // Backpressure (full buffer, then full queue, then an unread socket) is what is meant
+        // to absorb an outage, so the delivery budget has to outlast the blocking budget
+        // rather than undercut it. Kafka rejects a value below linger + request timeout, so
+        // the floor is applied here instead of letting a small configured budget refuse to
+        // start the producer at all.
+        properties.put(
+                ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG,
+                Math.toIntExact(Math.max(
+                        config.producerMaxBlock().toMillis(), (long) lingerMs + requestTimeoutMs)));
         return properties;
     }
 
