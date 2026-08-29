@@ -1,0 +1,23 @@
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Streams logs its full resolved config for the app, its consumer, its producer, its
+       restore consumer and its admin client on every start. That is five screens of output
+       burying the processor's own startup lines and the state transitions that matter. -->
+  <logger name="org.apache.kafka.streams.StreamsConfig" level="WARN"/>
+  <logger name="org.apache.kafka.clients.consumer.ConsumerConfig" level="WARN"/>
+  <logger name="org.apache.kafka.clients.producer.ProducerConfig" level="WARN"/>
+  <logger name="org.apache.kafka.clients.admin.AdminClientConfig" level="WARN"/>
+  <logger name="org.apache.kafka.common.utils.AppInfoParser" level="WARN"/>
+  <!-- Each Avro serde logs its full registry client config the first time it is used, and
+       the topology builds four of them. -->
+  <logger name="io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig" level="WARN"/>
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>

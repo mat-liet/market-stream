@@ -39,22 +39,52 @@
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
     </dependency>
+    <!-- Reads the live processor_version row at startup, so every candle's
+         processorVersion is traceable to a registered deploy (section 15.3). -->
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+    </dependency>
 
-    <!-- TopologyTestDriver drives the deterministic fixture tests (M7) -->
+    <!-- TopologyTestDriver drives the deterministic fixture test, which is a phase 1
+         completion criterion rather than a nice-to-have (section 29). -->
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-streams-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>kafka</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <scope>test</scope>
-    </dependency>
+    <!-- No Testcontainers here on purpose: it cannot start a Kafka container against
+         Docker Engine 29, so ProcessorEosIT runs against the `make up` stack and skips
+         when it is down. Same reasoning as kraken-ingestor's RawFramePublisherIT. -->
   </dependencies>
+
+  <build>
+    <finalName>market-processor</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>runnable-jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <!-- This list replaces the one managed in the parent rather than adding to
+                   it, so ServicesResourceTransformer has to be repeated. Dropping it
+                   would break Kafka and Confluent, which both register services. -->
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.marketstream.processor.Main</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

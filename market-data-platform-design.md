@@ -719,6 +719,25 @@ flowchart TB
 | 10s | 5 s | Balance latency vs completeness |
 | 1m | 15–30 s | Most tolerant; 1m candles are the "storage of record" candle |
 
+> **Finding from M3 (2026-08-29) — finalisation is driven by stream time, not the wall clock.**
+>
+> `suppress(untilWindowCloses)` releases a window's final result only when a *later record*
+> advances stream time past `windowEnd + grace`. Nothing emits on a timer. The practical
+> consequence: on a quiet instrument the most recent window stays unfinalised — indefinitely,
+> if it never trades again — and the phrase "after which it is closed" above should be read
+> as "after which the next trade closes it".
+>
+> This is a deliberate trade-off, not an oversight. A wall-clock punctuator would close
+> windows promptly and make the output depend on *when* the job ran, which breaks
+> correctness invariant 6 (§23.5) and would leave the deterministic fixture test unable to
+> pass at all. Correct-and-late beats timely-and-irreproducible.
+>
+> Observed cost on the Phase 1 instruments is seconds: BTC/USD and ETH/USD trade often
+> enough that the next trade is never far away. It matters for thinly traded markets, and
+> the honest mitigation there is a synthetic stream-time heartbeat on the input topic
+> (a record that advances time without contributing to any aggregate) rather than a
+> punctuator — revisit if Phase 5 adds an illiquid instrument.
+
 **Late event after window close.** If a trade arrives with `eventTime` inside a window that has already closed *plus grace*:
 - It is **excluded** from that window's aggregate (the final candle stands).
 - It is **counted** in a `late_events_total` metric and **sampled** to `invalid.events` (reason `LATE_BEYOND_GRACE`) for analysis.

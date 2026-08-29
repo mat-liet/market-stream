@@ -72,4 +72,21 @@ the IDE against the stack. `make up-services` brings up the containerised copy f
 the deployed shape.
 
 Integration tests (`*IT`) run against the `make up` stack and **skip** when it is not
-running, so `mvn verify` passes either way.
+running, so `mvn verify` passes either way. `ProcessorEosIT` additionally needs
+`make up-services`, because it drives the deployed processor rather than an embedded copy.
+
+Once both are up, `http://localhost:9101/metrics` and `http://localhost:9102/metrics` show
+the ingestor and processor, and Redpanda Console at `http://localhost:8085` is the easiest
+way to look at the topics — `kafka-avro-console-consumer` cannot render these schemas
+(without logical-type converters it fails on `decimal`, with them it fails on `uuid`).
+
+### What runs today
+
+Live Kraken trades flow `WS → raw.kraken.trade → normalized.trades → derived.candles`,
+with 1-minute event-time OHLCV/VWAP candles emitted provisionally and then finalised after
+a 30-second grace. Candles are not yet stored or served — that is M4 and M5.
+
+One behaviour worth knowing before you watch the topic: a window is finalised by the *next*
+trade that advances stream time past its grace, never by a timer, so the most recent window
+always sits unfinalised until the market moves again. The reasoning is recorded in
+[§13.1 of the design](market-data-platform-design.md).

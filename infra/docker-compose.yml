@@ -232,6 +232,45 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  market-processor:
+    build:
+      context: ..
+      dockerfile: market-processor/Dockerfile
+    image: market-stream/market-processor:0.1.0-SNAPSHOT
+    container_name: ms-market-processor
+    profiles: [services]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_URL: jdbc:postgresql://postgres:5432/market
+      POSTGRES_USER: market
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-market}
+      METRICS_PORT: 9102
+    ports:
+      - "127.0.0.1:9102:9102"
+    volumes:
+      # RocksDB state and the changelog offsets that go with it. Losing this is survivable —
+      # Streams restores from the changelog topics — but a restore is slow and pointless to
+      # repeat on every restart.
+      - processor-state:/var/lib/market-processor
+    healthcheck:
+      # /health reports the Streams state, so a topology that is alive but ERROR or
+      # PENDING_SHUTDOWN fails the check rather than looking fine.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9102/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+
   # ------------------------------------------------------- observability ----
 
   prometheus:
@@ -272,5 +311,6 @@ volumes:
   kafka-data:
   clickhouse-data:
   postgres-data:
+  processor-state:
   prometheus-data:
   grafana-data:
