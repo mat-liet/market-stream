@@ -926,6 +926,36 @@ In all non-LIVE states, `derived.book.metrics` either stops for that instrument 
 - **Idempotent writes** via `ReplacingMergeTree` keyed by natural identity (`eventId` for trades/metrics; `(exchange,instrument,window,windowStart)` for candles). A replayed or duplicated record overwrites rather than duplicating. Reads that must not see pre-merge duplicates use `FINAL` or aggregate-away duplicates.
 - **Backpressure when storage is unavailable:** the sink **stops committing offsets and stops consuming**; data accumulates safely in Kafka up to retention. This is preferred to any in-memory buffering that could lose data on sink crash. Alerts fire on rising `consumer_lag` and `db_write_failures`. The bound is Kafka retention — if ClickHouse is down longer than retention, the oldest raw/derived data ages out; the mitigation is generous raw retention + object-store archive so nothing needed for replay is lost.
 
+> **Findings from M4 (2026-08-30) — what "stops consuming" and "never drop" cost in practice.**
+>
+> **1. Pausing is what makes "stop consuming" survivable.** A loop that simply blocks in a
+> retry while ClickHouse is down stops calling `poll()`, and the broker evicts it on
+> `max.poll.interval.ms` — turning an outage into a permanent rebalance storm on top of the
+> outage. The sink instead **pauses its assignment** and keeps polling: a paused poll fetches
+> nothing but still heartbeats, so the consumer holds its partitions and its uncommitted
+> offsets for as long as the outage lasts. "Stop consuming" means pause, not stop polling.
+>
+> **2. "Never drop" needs a way to be safe.** The sink's retry is unbounded, which is only
+> defensible if no row can fail forever — and §22 gives the sink **read-only** Kafka ACLs, so
+> it has nowhere to route a poison record even though `InvalidEvent.stage=SINK` exists. The
+> resolution is to validate every value against its column *before* it enters a batch
+> (decimal precision, `DateTime64(3)` range, unsigned counts). A row that cannot be stored is
+> logged whole, counted on `sink_rows_rejected`, and dropped as a deliberate data-quality
+> event; every failure the `INSERT` can still hit is then transient by construction. Phase 2
+> should revisit the ACL so these become real `invalid.events` records.
+>
+> **3. `market.candles` stores finals only.** The table has no `is_final` column, so a
+> provisional row would be indistinguishable from the final row about to replace it. The sink
+> therefore skips `isFinal=false` entirely rather than relying on §9's "the final row
+> overwrites the provisional one" — which would have been true, but would have left every
+> reader unable to tell a settled window from a moving one in the gap between the two writes.
+> Every row in the table is immutable by construction (invariant 1).
+>
+> **4. Offsets must advance for skipped records too.** Most of `derived.candles` is
+> provisional and never written. Keying the commit off "we wrote a batch" would leave those
+> offsets uncommitted indefinitely and replay the topic from the start of retention on every
+> restart, so the commit is keyed off records *consumed*, written or not.
+
 ---
 
 ## 16. API design

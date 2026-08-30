@@ -1,4 +1,4 @@
-package com.marketstream.ingestor;
+package com.marketstream.common;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

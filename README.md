@@ -75,18 +75,39 @@ Integration tests (`*IT`) run against the `make up` stack and **skip** when it i
 running, so `mvn verify` passes either way. `ProcessorEosIT` additionally needs
 `make up-services`, because it drives the deployed processor rather than an embedded copy.
 
-Once both are up, `http://localhost:9101/metrics` and `http://localhost:9102/metrics` show
-the ingestor and processor, and Redpanda Console at `http://localhost:8085` is the easiest
+`ClickHouseSinkIT` writes rows under a throwaway `IT/<uuid>` instrument, so it neither
+collides with nor cleans up the live pipeline's data.
+
+Once both are up, `http://localhost:9101/metrics`, `:9102/metrics` and `:9103/metrics` show
+the ingestor, processor and sink, and Redpanda Console at `http://localhost:8085` is the easiest
 way to look at the topics — `kafka-avro-console-consumer` cannot render these schemas
 (without logical-type converters it fails on `decimal`, with them it fails on `uuid`).
 
 ### What runs today
 
-Live Kraken trades flow `WS → raw.kraken.trade → normalized.trades → derived.candles`,
-with 1-minute event-time OHLCV/VWAP candles emitted provisionally and then finalised after
-a 30-second grace. Candles are not yet stored or served — that is M4 and M5.
+Live Kraken trades flow `WS → raw.kraken.trade → normalized.trades → derived.candles →
+ClickHouse`, with 1-minute event-time OHLCV/VWAP candles emitted provisionally and then
+finalised after a 30-second grace. Nothing serves them yet — that is M5.
 
-One behaviour worth knowing before you watch the topic: a window is finalised by the *next*
-trade that advances stream time past its grace, never by a timer, so the most recent window
-always sits unfinalised until the market moves again. The reasoning is recorded in
-[§13.1 of the design](market-data-platform-design.md).
+```sql
+SELECT window_start, open, high, low, close, volume, vwap
+FROM market.candles FINAL
+WHERE instrument = 'BTC/USD'
+ORDER BY window_start DESC LIMIT 10;
+```
+
+Three behaviours worth knowing before you go looking:
+
+- **A window is finalised by the *next* trade** that advances stream time past its grace,
+  never by a timer, so the most recent window always sits unfinalised until the market moves
+  again. The reasoning is recorded in [§13.1 of the design](market-data-platform-design.md).
+- **`market.candles` holds finals only.** The sink drops `isFinal=false` rows, so every row
+  in the table is settled. This is why the freshest minute is missing rather than wrong.
+- **`FINAL` in the query is not optional.** Both tables are `ReplacingMergeTree`, and a
+  redelivery is collapsed on merge rather than on write, so a plain `count()` can briefly
+  show duplicates that `count() FINAL` does not.
+
+If ClickHouse goes away the sink does not: it pauses its consumers, holds its offsets, and
+lets lag build in Kafka until the database returns — `market_sink_paused` goes to 1 and
+`make lag` shows the two sink groups climbing. Nothing is buffered in memory and nothing is
+dropped, bounded only by topic retention.

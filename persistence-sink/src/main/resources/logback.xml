@@ -1,0 +1,19 @@
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Each consumer logs its full resolved config on construction, and there are two. -->
+  <logger name="org.apache.kafka.clients.consumer.ConsumerConfig" level="WARN"/>
+  <logger name="org.apache.kafka.common.utils.AppInfoParser" level="WARN"/>
+  <logger name="io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig" level="WARN"/>
+  <!-- The JDBC driver logs a line per statement at INFO, which at 5000-row batches is the
+       only thing anyone would ever see. -->
+  <logger name="com.clickhouse" level="WARN"/>
+
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>

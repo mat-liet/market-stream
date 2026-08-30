@@ -29,11 +29,12 @@ core: ## Start only the data path (no Prometheus/Grafana)
 	$(COMPOSE) --profile core up -d
 
 .PHONY: up-services
-up-services: ## Build and start the containerised services (kraken-ingestor, market-processor)
+up-services: ## Build and start the containerised services (ingestor, processor, sink)
 	$(COMPOSE) --profile core --profile services up -d --build
 	@echo
 	@echo "  Ingestor metrics   http://localhost:9101/metrics"
 	@echo "  Processor metrics  http://localhost:9102/metrics"
+	@echo "  Sink metrics       http://localhost:9103/metrics"
 
 .PHONY: down
 down: ## Stop the stack, keeping volumes

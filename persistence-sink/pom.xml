@@ -41,20 +41,44 @@
       <artifactId>logback-classic</artifactId>
     </dependency>
 
+    <!-- Testcontainers is deliberately absent: it cannot start a Kafka broker on this
+         machine's Docker Engine 29, so the integration tests run against the `make up`
+         stack and skip when it is down, exactly as the ingestor's and processor's do. -->
     <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>clickhouse</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>kafka</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.testcontainers</groupId>
-      <artifactId>junit-jupiter</artifactId>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
+
+  <build>
+    <finalName>persistence-sink</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>runnable-jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <!-- This list replaces the one managed in the parent rather than adding to
+                   it, so ServicesResourceTransformer has to be repeated. Dropping it would
+                   break Kafka, Confluent and the ClickHouse JDBC driver, all of which
+                   register services. -->
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.marketstream.sink.Main</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

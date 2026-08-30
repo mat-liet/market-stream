@@ -271,6 +271,43 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
+  persistence-sink:
+    build:
+      context: ..
+      dockerfile: persistence-sink/Dockerfile
+    image: market-stream/persistence-sink:0.1.0-SNAPSHOT
+    container_name: ms-persistence-sink
+    profiles: [services]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CLICKHOUSE_URL: jdbc:ch://clickhouse:8123/market
+      CLICKHOUSE_USER: market
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-market}
+      METRICS_PORT: 9103
+    ports:
+      - "127.0.0.1:9103:9103"
+    # No volume: the sink is stateless. Everything it has not yet written is still in Kafka
+    # behind an uncommitted offset, which is what makes a restart safe.
+    healthcheck:
+      # /health reports whether both consumer loops are alive. A ClickHouse outage is
+      # deliberately still healthy — pausing is the designed behaviour, and restarting into
+      # the same outage would help nobody.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9103/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+
   # ------------------------------------------------------- observability ----
 
   prometheus:
